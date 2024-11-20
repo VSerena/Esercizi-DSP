@@ -1,0 +1,78 @@
+import numpy as np
+
+def is_valid_key(key):
+    """Verifica se la matrice chiave è valida."""
+    det = int(round(np.linalg.det(key)))
+    return math.gcd(det, 26) == 1
+
+def generate_valid_key(dim):
+    """Genera una matrice chiave valida di dimensione dim x dim."""
+    while True:
+        key = np.random.randint(0, 26, size=(dim, dim))
+        det = int(round(np.linalg.det(key)))
+        if math.gcd(det, 26) == 1:
+            return key
+
+class Hill:
+    def __init__(self, key=None, block_dim=2):
+        self.block_dim = block_dim
+        if key is None:
+            self.key = generate_valid_key(block_dim)
+        elif is_valid_key(key):
+            self.key = key
+        else:
+            raise ValueError("La matrice chiave fornita non è valida.")
+        self.pt = "attackatdawn".lower()  # Testo in chiaro
+        self.ct = ""
+
+    def encryption(self):
+        """Cifra il testo in chiaro usando l'algoritmo di Hill."""
+        self.ct = ""
+        pt_numeric = [ord(c) - ord('a') for c in self.pt]
+        padded_length = len(pt_numeric) + (self.block_dim - len(pt_numeric) % self.block_dim) % self.block_dim
+        pt_numeric += [0] * (padded_length - len(pt_numeric))  # Padding
+
+        pt_blocks = np.array(pt_numeric).reshape(-1, self.block_dim)
+        for block in pt_blocks:
+            encrypted_block = np.dot(self.key, block) % 26
+            self.ct += ''.join(chr(num + ord('a')) for num in encrypted_block)
+
+        print(f"Testo cifrato (CT): {self.ct}")
+
+    def decryption(self):
+        """Decifra il testo cifrato usando l'algoritmo di Hill."""
+        try:
+            det = int(round(np.linalg.det(self.key)))  # Determinante della matrice chiave
+            if math.gcd(det, 26) != 1:
+                raise ValueError("La matrice chiave non è valida (determinante non invertibile modulo 26).")
+
+            det_inv = pow(det, -1, 26)  # Inverso del determinante modulo 26
+
+            # Calcola la matrice aggiunta e l'inversa
+            adjugate = np.round(det * np.linalg.inv(self.key)).astype(int) % 26
+            key_inv = (det_inv * adjugate) % 26
+
+            # Converti il testo cifrato in blocchi numerici
+            ct_numeric = [ord(c) - ord('a') for c in self.ct]
+            ct_blocks = np.array(ct_numeric).reshape(-1, self.block_dim)
+
+            # Decifra i blocchi
+            self.pt = ""
+            for block in ct_blocks:
+                decrypted_block = np.dot(key_inv, block) % 26
+                self.pt += ''.join(chr(num + ord('a')) for num in decrypted_block)
+
+            print(f"Testo decifrato (PT): {self.pt}")
+
+        except ValueError as e:
+            print(f"Errore durante la decifrazione: {e}")
+
+
+    def get_pt(self):
+        return self.pt
+
+    def get_ct(self):
+        return self.ct
+
+    def get_block_dim(self):
+        return self.block_dim
