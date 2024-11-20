@@ -1,0 +1,190 @@
+import math
+from collections import Counter, defaultdict
+import numpy as np
+
+
+class Vigenere:
+    def __init__(self) -> None:
+        self.ct = (
+            "ZYIVIUPYKFJZLKRRIFVJMTGBLTSAVYEPXFWYIJTU"
+            "KSSXHKRJOKLKEYEBTVQGRCAYQVHYXXAVMYXGXNIZVRYRWZOBJ"
+            "YMYKXOHTUETHLOHTULOQYEYLGYYLKDVTKSGDUNRUWMTGXENYZ"
+            "RMZOSPUJMZCZHRGZVGVUUAJYMSFKCBSZRMTGIALLPRCANLOVPJ"
+            "MTGOKWSXINEFRZTVIJFEKVXUSTEFOUIZLKSRTJIZLGTQOJGUZK"
+            "RVTXECEETBHIIGGNTUOJFGVXIRXNSAPJSBSVLUARIOKIEZINIZ"
+            "CRWISSPRRCMTKHUGNVOTICIGCRWGFYUEJVZKROFUKUMJJONQGW"
+            "PGAONGNVTXSMRNSNLOGNEAGSPKHNIZZFFXIGKGNISAKNHRQEIC"
+            "LKDTGZRTSZHVTXFAXJEPXVEYMTGYEIIGPOSGOTWAVXOHTUMTKY"
+            "TUKIIISXDVTXGUYRDBTCCISTTNOEGUQVLRZVMTJURZGKMURLOEV"
+            "FMTXYOSBZICAOTUOEEIIXTNOEJOROTRFFRKERLGNVVKAGSGUVWI"
+            "EVEGUNEYEXETOFRCLKRRNZWBMKWBLKLKGOTLCFYRHHESACPUJJI"
+            "FZFVZMUNFGEHUQOSFOFRYETDJULPJIBEAZLERPEFNJVXUFRAPQY"
+            "IYXKPCKUFGGQFEUDXNIIOETVVNERFQOJTOVOTRJYERJGMHYVHCL"
+            "GTUGULKLUPRJKSLMTDNJFSXEZTUKVHMIUFGNVQUHKLZGIOKHKXV"
+            "ZKLXSAGUCYMILNEPULPJAGLXULXORZOEKRPOXE".lower()
+        )
+        self.repetitions_dict = defaultdict(int)
+        self.trigrams_positions_dict = defaultdict(list)
+        self.trigrams_distances_dict = {}
+        self.trigrams_gcd_dict = {}
+        self.best_key = None
+        self.key = ""
+
+    def repetitions(self) -> None:
+        """Calcola le ripetizioni di ogni trigramma nel testo."""
+        for i in range(len(self.ct) - 2):
+            trigram = self.ct[i:i+3]
+            self.repetitions_dict[trigram] += 1
+
+        # Filtra i trigrammi con più di una ripetizione
+        self.trigrams_with_repetitions = {
+            k: v for k, v in self.repetitions_dict.items() if v > 1
+        }
+
+        print("Tutte le ripetizioni:", dict(self.repetitions_dict))
+        print("Ripetizioni (caso con ripetizioni > 1):", self.trigrams_with_repetitions)
+
+    def calculate_positions(self) -> None:
+        """Calcola le posizioni di ogni trigramma ripetuto."""
+        for trigram in self.trigrams_with_repetitions:
+            self.trigrams_positions_dict[trigram] = [
+                i for i in range(len(self.ct) - 2) if self.ct[i:i+3] == trigram
+            ]
+        print("Posizioni dei trigrammi ripetuti:", self.trigrams_positions_dict)
+
+    def calculate_distances(self) -> None:
+        """Calcola le distanze tra le occorrenze dei trigrammi."""
+        for trigram, positions in self.trigrams_positions_dict.items():
+            distances = [positions[i] - positions[i - 1] for i in range(1, len(positions))]
+            if distances:
+                self.trigrams_distances_dict[trigram] = distances
+        print("Distanze:", self.trigrams_distances_dict)
+
+    def m_values(self) -> None:
+        """Calcola i possibili valori di m (lunghezza della chiave)."""
+        for trigram, distances in self.trigrams_distances_dict.items():
+            self.trigrams_gcd_dict[trigram] = math.gcd(*distances)
+
+        print("MCD dei trigrammi:", self.trigrams_gcd_dict)
+
+        # Frequenza dei valori di m
+        gcd_frequencies = Counter(self.trigrams_gcd_dict.values())
+        print("Distribuzione dei valori di m:", gcd_frequencies)
+
+        most_common_m = gcd_frequencies.most_common(1)[0][0]
+        print(f"L'm più comune è: {most_common_m}")
+
+    def correct_m_and_coincidences_indexes(self) -> None:
+        """Trova il miglior m minimizzando la deviazione dagli indici di coincidenza."""
+        IC_IDEALE = 0.065
+        min_deviation = float('inf')
+
+        for m in range(2, 16):
+            encoded_txts = self._get_encoded_txt_with_same_rotation_key(m)
+            indexes = [self._get_coincidence_index(encoded_txt) for encoded_txt in encoded_txts]
+            deviation = math.sqrt(
+                sum((ic - IC_IDEALE) ** 2 for ic in indexes) / m
+            )
+
+            if deviation < min_deviation:
+                self.best_key = m
+                min_deviation = deviation
+
+        print(f"Miglior m trovato: {self.best_key}")
+
+    def _get_encoded_txt_with_same_rotation_key(self, key: int) -> list:
+        """Divide il testo cifrato in gruppi basati sulla lunghezza della chiave."""
+        encoded_txt = ["" for _ in range(key)]
+        for i, char in enumerate(self.ct):
+            encoded_txt[i % key] += char
+        return encoded_txt
+
+    def _get_coincidence_index(self, txt: str) -> float:
+        """Calcola l'indice di coincidenza per un dato testo."""
+        freq = Counter(txt)
+        N = len(txt)
+        return sum(f * (f - 1) for f in freq.values()) / (N * (N - 1)) if N > 1 else 0
+
+    def decryption(self) -> None:
+        """Decifra il testo cifrato utilizzando la chiave determinata."""
+        # Converti la chiave e il testo cifrato in valori numerici
+        key = [ord(k) - ord('a') for k in self.key]
+        cipher_text = [ord(c) - ord('a') for c in self.ct]
+
+        # Decifra il testo
+        plain_text = ""
+        for i in range(len(cipher_text)):
+            # Calcolo del carattere decifrato
+            decrypted_char = (cipher_text[i] - key[i % len(key)]) % 26
+            plain_text += chr(decrypted_char + ord('a'))
+
+        print("Il testo decifrato è:", plain_text)
+
+    def calculate_key(self) -> None:
+        """Determina la chiave di cifratura basandosi sulle frequenze."""
+        # Divide il testo cifrato in gruppi basati sul valore di m trovato
+        encoded_txts = self._get_encoded_txt_with_same_rotation_key(self.best_key)
+
+        # Definisci l'alfabeto e le frequenze inglesi
+        alphabet = "abcdefghijklmnopqrstuvwxyz"
+        english_frequencies = np.array([
+            0.08167, 0.01492, 0.02782, 0.04253, 0.12702, 0.02228, 0.02015, 0.06094,
+            0.06966, 0.00153, 0.00772, 0.04025, 0.02406, 0.06749, 0.07507, 0.01929,
+            0.00095, 0.05987, 0.06327, 0.09056, 0.02758, 0.00978, 0.02360, 0.00150,
+            0.01974, 0.00074
+        ])
+
+        self.key = ""
+
+        for encoded_txt in encoded_txts:
+            # Conta le occorrenze delle lettere nel gruppo
+            occurrences = Counter(encoded_txt)
+            total = sum(occurrences.values())
+            group_frequencies = np.array([
+                occurrences.get(chr_, 0) / total for chr_ in alphabet
+            ])
+
+            # Determina lo shift migliore confrontando le frequenze
+            max_correlation = -1
+            best_shift = 0
+
+            for shift in range(26):
+                shifted_frequencies = np.roll(group_frequencies, -shift)
+                correlation = np.dot(shifted_frequencies, english_frequencies)
+
+                if correlation > max_correlation:
+                    max_correlation = correlation
+                    best_shift = shift
+
+            # Converti lo shift in una lettera della chiave
+            self.key += chr(best_shift + ord('a'))
+
+        print(f"La chiave calcolata è: {self.key}")
+
+
+def main():
+    v = Vigenere()
+
+    # Ripetizioni
+    v.repetitions()
+
+    # Posizioni
+    v.calculate_positions()
+
+    # Distanze
+    v.calculate_distances()
+
+    # Valori di m
+    v.m_values()
+
+    # Miglior m
+    v.correct_m_and_coincidences_indexes()
+
+    # Calcolo della chiave
+    v.calculate_key()
+
+    # Decifrazione
+    v.decryption()
+
+if __name__ == "__main__":
+    main()
