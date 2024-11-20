@@ -1,0 +1,22 @@
+class Attacker:
+    def __init__(self, pt, ct, block_dim):
+        self.pt = pt
+        self.ct = ct
+        self.block_dim = block_dim
+
+    def attack(self):
+        """Effettua l'attacco recuperando la chiave."""
+        pt_numeric = [ord(c) - ord('a') for c in self.pt[:self.block_dim ** 2]]
+        ct_numeric = [ord(c) - ord('a') for c in self.ct[:self.block_dim ** 2]]
+
+        pt_matrix = np.array(pt_numeric).reshape(self.block_dim, -1)
+        ct_matrix = np.array(ct_numeric).reshape(self.block_dim, -1)
+
+        det = int(round(np.linalg.det(pt_matrix)))  # Determinante della matrice
+        det_inv = pow(det, -1, 26)  # Inverso del determinante modulo 26
+
+        adjugate = np.round(det * np.linalg.inv(pt_matrix)).astype(int) % 26
+        key_matrix = (det_inv * adjugate @ ct_matrix) % 26
+
+        print("Matrice chiave ricostruita:")
+        print(key_matrix)
