@@ -1,0 +1,15 @@
+def main():
+    hill = Hill()
+
+    # Fase di Encryption
+    hill.encryption()
+
+    # Fase di Decryption
+    hill.decryption()
+
+    # Attacco
+    attacker = Attacker(hill.get_pt(), hill.get_ct(), hill.get_block_dim())
+    attacker.attack()
+
+if __name__ == "__main__":
+    main()
